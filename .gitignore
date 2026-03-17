@@ -1,0 +1,76 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Build results
+[Bb]in/
+[Oo]bj/
+
+# NuGet
+*.nupkg
+packages/
+project.lock.json
+project.fragment.lock.json
+.nuget/
+
+# Visual Studio Code
+.vscode/
+
+# Rider
+.idea/
+*.sln.iml
+
+# IIS Express
+\.vs\config\applicationhost.config
+
+# Resharper
+_ReSharper*/
+*.[Rr]e[Ss]harper
+
+# Test results
+TestResults/
+*.trx
+
+# Publish
+*.publish.xml
+
+# Windows image file caches
+Thumbs.db
+ehthumbs.db
+
+# JetBrains
+*.DotSettings.user
+
+# Others
+*.log
+*.cache
+*.bak
+*.swp
+
+# Rider and VS temp
+.idea/
+*.suo
+
+# Ignore user secrets file
+secrets.json
+
+# Ignore database files
+*.mdf
+*.ldf
+
+# DotCover
+*.dotCover
+
+# Coverage results
+coverage*/
+
+# Node
+node_modules/
+
+# Docker
+docker-compose.override.yml
+
+# End of file
