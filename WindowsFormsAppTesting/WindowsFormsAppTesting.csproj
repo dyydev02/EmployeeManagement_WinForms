@@ -46,9 +46,15 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="DetailForm.cs">
+    <Compile Include="DataAccess.cs" />
+    <Compile Include="DepartmentDetailForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="DepartmentDetailForm.Designer.cs">
+      <DependentUpon>DepartmentDetailForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="DepartmentRepository.cs" />
+    <Compile Include="EmployeeRepository.cs" />
     <Compile Include="Form1.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -57,6 +63,9 @@
     </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <EmbeddedResource Include="DepartmentDetailForm.resx">
+      <DependentUpon>DepartmentDetailForm.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="Form1.resx">
       <DependentUpon>Form1.cs</DependentUpon>
     </EmbeddedResource>

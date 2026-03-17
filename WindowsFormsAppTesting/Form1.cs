@@ -17,72 +17,85 @@ namespace WindowsFormsAppTesting
     public partial class Form1 : Form
     {
         // reuse connection string in one place
-        private readonly string _connectionString = "Server=DSK065\\LOCAL;Database=EmployeeDb;Trusted_Connection=True;TrustServerCertificate=True";
+        private readonly string _connectionString = "Server=.\\SQLEXPRESS;Database=EmployeeManagement;Trusted_Connection=True;TrustServerCertificate=True";
         private readonly string _loadDataQuery = "select e.Id, e.EmployeeName, e.DayOfBirth, e.DepartmentId, p.DepartmentName, e.Status from Employees e join Departments p on e.DepartmentId = p.Id";
         private string _currentView = "Employees";
+
+        // data layer
+        private readonly DataAccess _dataAccess;
+        private readonly EmployeeRepository _employeeRepo;
+        private readonly DepartmentRepository _departmentRepo;
         public Form1()
         {
             InitializeComponent();
+            _dataAccess = new DataAccess(_connectionString);
+            _employeeRepo = new EmployeeRepository(_dataAccess);
+            _departmentRepo = new DepartmentRepository(_dataAccess);
         }
-        // Insert new employee into database
+
+        private void dataGridView1_CellClick(object sender, DataGridViewCellEventArgs e)
+        {
+            // ensure row clicks populate the form the same way as content clicks
+            dataGridView1_CellContentClick(sender, e);
+        }
+
+        private void dataGridView1_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            // when double-clicking a department row, show its details including employees
+            if (e.RowIndex < 0) return;
+            if (_currentView != "Departments") return;
+
+            var row = dataGridView1.Rows[e.RowIndex];
+            var idObj = row.Cells["Id"].Value;
+            var nameObj = row.Cells["DepartmentName"].Value;
+            if (idObj == null) return;
+
+            int deptId;
+            try { deptId = Convert.ToInt32(idObj); }
+            catch { return; }
+
+            var deptName = nameObj?.ToString() ?? string.Empty;
+            var employees = _employeeRepo.GetByDepartmentId(deptId);
+
+            using (var dlg = new DepartmentDetailForm(deptId, deptName, employees))
+            {
+                dlg.ShowDialog(this);
+            }
+        }
+        // Insert new employee into database (calls repository)
         private void CreateEmployee(string name, DateTime dob, int departmentId, string status)
         {
-            var query = "INSERT INTO Employees (EmployeeName, DayOfBirth, DepartmentId, Status) VALUES (@name, @dob, @deptId, @status)";
+            _employeeRepo.Create(name, dob, departmentId, status);
+        }
+        // Department CRUD wrappers to mirror employee methods
+        private void CreateDepartment(string name)
+        {
+            _departmentRepo.Create(name);
+        }
 
-            using (var conn = new SqlConnection(_connectionString))
-            using (var cmd = new SqlCommand(query, conn))
-            {
-                cmd.Parameters.Add("@name", SqlDbType.NVarChar, 200).Value = name ?? string.Empty;
-                cmd.Parameters.Add("@DayOfBirth", SqlDbType.Date).Value = dob.Date;
-                cmd.Parameters.Add("@dob", SqlDbType.Date).Value = dob.Date;
-                cmd.Parameters.Add("@deptId", SqlDbType.Int).Value = departmentId;
-                cmd.Parameters.Add("@status", SqlDbType.NVarChar, 50).Value = status ?? string.Empty;
+        private bool UpdateDepartment(int id, string name)
+        {
+            return _departmentRepo.Update(id, name);
+        }
 
-                conn.Open();
-            }
-        } 
-        // Delete employee by id
+        private bool DeleteDepartment(int id)
+        {
+            return _departmentRepo.Delete(id);
+        }
+        // Delete employee by id (repository)
         private bool DeleteEmployee(int id)
         {
-            var query = "DELETE FROM Employees WHERE Id = @id";
-            using (var conn = new SqlConnection(_connectionString))
-            using (var cmd = new SqlCommand(query, conn))
-            {
-                cmd.Parameters.Add("@id", SqlDbType.Int).Value = id;
-                conn.Open();
-               return cmd.ExecuteNonQuery() >0;
-            }
+            return _employeeRepo.Delete(id);
         }
-        // Update employee by id
+        // Update employee by id (repository)
         private bool UpdateEmployee(int id, string name, DateTime dob, int departmentId, string status)
         {
-            var query = "UPDATE Employees SET EmployeeName = @name, DayOfBirth = @dob, DepartmentId = @deptId, Status = @status WHERE Id = @id";
-            using (var conn = new SqlConnection(_connectionString))
-            using (var cmd = new SqlCommand(query, conn))
-            {
-                cmd.Parameters.Add("@id", SqlDbType.Int).Value = id;
-                cmd.Parameters.Add("@name", SqlDbType.NVarChar, 200).Value = name ?? string.Empty;
-                cmd.Parameters.Add("@dob", SqlDbType.Date).Value = dob.Date;
-                cmd.Parameters.Add("@deptId", SqlDbType.Int).Value = departmentId;
-                cmd.Parameters.Add("@status", SqlDbType.NVarChar, 50).Value = status ?? string.Empty;
-                conn.Open();
-                return cmd.ExecuteNonQuery() > 0; // returns true if at least one row was updated
-            }
+            return _employeeRepo.Update(id, name, dob, departmentId, status);
         }
         // Execute query and return DataTable
         private DataTable ExecuteQuery(string query)
         {
-            if (string.IsNullOrWhiteSpace(query))
-                throw new ArgumentException("Query is null or empty", nameof(query));
-
-            var dt = new DataTable();
-            using (var connection = new SqlConnection(_connectionString))
-            using (var adapter = new SqlDataAdapter(query, connection))
-            {
-                adapter.Fill(dt);
-            }
-
-            return dt;
+            return _dataAccess.Query(query);
         }
 
         // Bind result to DataGridView
@@ -91,7 +104,6 @@ namespace WindowsFormsAppTesting
             try
             {
                 var dataTable = ExecuteQuery(query);
-
                 dataGridView1.DataSource = null;
                 dataGridView1.Columns.Clear();
                 dataGridView1.AutoGenerateColumns = true;
@@ -105,7 +117,7 @@ namespace WindowsFormsAppTesting
             }
         }
 
-        // Generic binder for ComboBox/ListBox (any ListControl)
+        // Generic data for ComboBox
         public void BindListControl(ListControl control, string displayMember, string valueMember, string query)
         {
             if (control == null)
@@ -114,10 +126,9 @@ namespace WindowsFormsAppTesting
             try
             {
                 var dt = ExecuteQuery(query);
-                control.DataSource = null;
+                control.DataSource = dt;
                 control.DisplayMember = displayMember;
                 control.ValueMember = valueMember;
-                control.DataSource = dt;
             }
             catch (Exception ex)
             {
@@ -170,14 +181,18 @@ namespace WindowsFormsAppTesting
                 }
                 else if (_currentView == "Departments")
                 {
-                txtDepartmentId.Text = row.Cells["Id"].Value?.ToString();
+                    txtEmployeeName.Text = "";
+                    dtpDayOfBirth.Text = "";
+                    ListStatus.SelectedValue = "";
+                    txtDepartmentId.Text = row.Cells["Id"].Value?.ToString();
 
                     // Departments query exposes column "Id".
                     // Use the existing "Id" column to set the selected value.
                     var deptVal = row.Cells["Id"].Value;
                     if (deptVal != null && ListDepartmentName.DataSource != null)
                     {
-                        try { ListDepartmentName.SelectedValue = deptVal; } catch { /* ignore if not present */ }
+                        ListDepartmentName.SelectedValue = deptVal;
+                        
                     }
 
                 }
@@ -190,27 +205,29 @@ namespace WindowsFormsAppTesting
 
         private void button1_Click(object sender, EventArgs e)
         {
-            // Create new employee from input fields
-            var name = txtEmployeeName.Text?.Trim();
-            if (string.IsNullOrWhiteSpace(name))
+            if (_currentView == "Employees")
             {
-                MessageBox.Show("Employee name is required.");
-                return;
-            }
+                // Create new employee from input fields
+                var name = txtEmployeeName.Text?.Trim();
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    MessageBox.Show("Employee name is required.");
+                    return;
+                }
 
-            DateTime dob;
-            if(dtpDayOfBirth.Value > DateTime.Now)
-            {
-                MessageBox.Show("Day of birth cannot be in the future.");
-                return;
-            }
-            else
-            {
-                dob = dtpDayOfBirth.Value.Date;
-            }
+                DateTime dob;
+                if (dtpDayOfBirth.Value > DateTime.Now)
+                {
+                    MessageBox.Show("Day of birth cannot be in the future.");
+                    return;
+                }
+                else
+                {
+                    dob = dtpDayOfBirth.Value.Date;
+                }
 
-            // selected Departmnetname convert to DepartmentId
-            int departmentId = 0;
+                // selected Departmnetname convert to DepartmentId
+                int departmentId = 0;
                 try
                 {
                     if (ListDepartmentName.SelectedValue != null)
@@ -220,27 +237,49 @@ namespace WindowsFormsAppTesting
                         MessageBox.Show("Please select a department.");
                         return;
                     }
+                }
+                catch
+                {
+                    MessageBox.Show("Invalid department id.");
+                    return;
+                }
+
+                var status = ListStatus?.SelectedValue?.ToString() ?? string.Empty;
+
+                try
+                {
+                    CreateEmployee(name, dob, departmentId, status);
+
+                    // reload grid
+                    LoadData(_loadDataQuery);
+                    MessageBox.Show("Employee created.");
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error creating employee: {ex.Message}");
+                }
             }
-
-            catch
+            else if (_currentView == "Departments")
             {
-                MessageBox.Show("Invalid department id.");
-                return;
-            }
+                var name = ListDepartmentName.Text?.Trim();
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    MessageBox.Show("Department name is required.");
+                    return;
+                }
 
-            var status = ListStatus?.SelectedValue?.ToString() ?? string.Empty;
-
-            try
-            {
-                CreateEmployee(name, dob, departmentId, status);
-
-                // reload grid
-                LoadData(_loadDataQuery);
-                MessageBox.Show("Employee created.");
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error creating employee: {ex.Message}");
+                    try
+                    {
+                        CreateDepartment(name);
+                        // reload grid
+                        LoadData("SELECT Id, DepartmentName FROM Departments");
+                        LoadDepartment();
+                        MessageBox.Show("Department created.");
+                    }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error creating department: {ex.Message}");
+                }
             }
         }
 
@@ -300,111 +339,191 @@ namespace WindowsFormsAppTesting
                 return;
             }
 
-            var idCell = dataGridView1.CurrentRow.Cells["Id"];
-            var nameCell = dataGridView1.CurrentRow.Cells["EmployeeName"];
-            if (idCell == null || idCell.Value == null)
-            {
-                MessageBox.Show("Selected row has no Id.");
-                return;
-            }
-
-            int id;
-            if (!int.TryParse(idCell.Value.ToString(), out id))
-            {
-                MessageBox.Show("Invalid Id value."); 
-                return;
-            }
-
-            var nameText = nameCell?.Value?.ToString() ?? string.Empty;
-            var confirm = MessageBox.Show($"Delete employee Id={id}, Name={nameText}?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-            if (confirm != DialogResult.Yes)
-                return;
-
             try
             {
-                DeleteEmployee(id);
-                // refresh grid
-                LoadData(_loadDataQuery);
-                MessageBox.Show("Employee deleted.");
+                if (_currentView == "Employees")
+                {
+                    var idCell = dataGridView1.CurrentRow.Cells["Id"];
+                    var nameCell = dataGridView1.CurrentRow.Cells["EmployeeName"];
+
+                    if (idCell == null || idCell.Value == null)
+                    {
+                        MessageBox.Show("Selected row has no Id.");
+                        return;
+                    }
+
+                    var id = Convert.ToInt32(idCell.Value);
+                    var nameText = nameCell?.Value?.ToString() ?? string.Empty;
+                    var confirm = MessageBox.Show($"Delete employee Id={id}, Name={nameText}?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                    if (confirm != DialogResult.Yes)
+                        return;
+
+                    var deleteResult = DeleteEmployee(id);
+                    if (deleteResult)
+                    {
+                        LoadData(_loadDataQuery);
+                        MessageBox.Show("Employee deleted.");
+                    }
+                    else
+                    {
+                        MessageBox.Show("No employee was deleted.");
+                    }
+                }
+                else if (_currentView == "Departments")
+                {
+                    var idCell = dataGridView1.CurrentRow.Cells["Id"];
+                    var nameCell = dataGridView1.CurrentRow.Cells["DepartmentName"];
+
+                    if (idCell == null || idCell.Value == null)
+                    {
+                        MessageBox.Show("Selected row has no Id.");
+                        return;
+                    }
+
+                    var id = Convert.ToInt32(idCell.Value);
+                    var nameText = nameCell?.Value?.ToString() ?? string.Empty;
+
+                    // prevent deleting a department that still has employees
+                    var employees = _employeeRepo.GetByDepartmentId(id);
+                    if (employees != null && employees.Rows.Count > 0)
+                    {
+                        MessageBox.Show($"Cannot delete department '{nameText}' (Id={id}) because it contains {employees.Rows.Count} employee(s). Remove or reassign employees first.");
+                        return;
+                    }
+
+                    var confirm = MessageBox.Show($"Delete department Id={id}, Name={nameText}?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                    if (confirm != DialogResult.Yes)
+                        return;
+
+                    var deleteDeptResult = DeleteDepartment(id);
+                    if (deleteDeptResult)
+                    {
+                        LoadData("SELECT Id, DepartmentName FROM Departments");
+                        LoadDepartment();
+                        MessageBox.Show("Department deleted.");
+                    }
+                    else
+                    {
+                        MessageBox.Show("No department was deleted.");
+                    }
+                }
+                else
+                {
+                    MessageBox.Show("Unknown view.");
+                }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error deleting employee: {ex.Message}");
+                MessageBox.Show($"Error deleting: {ex.Message}");
             }
         }
 
         private void btn_Update_Click(object sender, EventArgs e)
         {
-            //validate 
+            // validate selected row id
             var idCell = dataGridView1.CurrentRow?.Cells["Id"];
             if (idCell == null || idCell.Value == null)
             {
                 MessageBox.Show("Selected row has no Id.");
                 return;
             }
+
             int id;
-            try
-            {
-                id = Convert.ToInt32(idCell.Value);
-            }
+            try { id = Convert.ToInt32(idCell.Value); }
             catch
             {
                 MessageBox.Show("Invalid Id.");
                 return;
             }
-            var name = txtEmployeeName.Text?.Trim();
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                MessageBox.Show("Employee name is required.");
-                return;
-            }
 
-            DateTime dob;
-            if (dtpDayOfBirth.Value > DateTime.Now)
-            {
-                MessageBox.Show("Day of birth cannot be in the future.");
-                return;
-            }
-            else
-            {
-                dob = dtpDayOfBirth.Value.Date;
-            }
-
-            // selected Departmnetname convert to DepartmentId
-            int departmentId = 0;
             try
             {
-                if (ListDepartmentName.SelectedValue != null)
-                    departmentId = Convert.ToInt32(ListDepartmentName.SelectedValue);
+                if (_currentView == "Employees")
+                {
+                    // Employee-specific validation
+                    var name = txtEmployeeName.Text?.Trim();
+                    if (string.IsNullOrWhiteSpace(name))
+                    {
+                        MessageBox.Show("Employee name is required.");
+                        return;
+                    }
+
+                    DateTime dob;
+                    if (dtpDayOfBirth.Value > DateTime.Now)
+                    {
+                        MessageBox.Show("Day of birth cannot be in the future.");
+                        return;
+                    }
+                    else
+                    {
+                        dob = dtpDayOfBirth.Value.Date;
+                    }
+
+                    int departmentId = 0;
+                    if (ListDepartmentName.SelectedValue != null)
+                    {
+                        try { departmentId = Convert.ToInt32(ListDepartmentName.SelectedValue); }
+                        catch
+                        {
+                            MessageBox.Show("Invalid department id.");
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        MessageBox.Show("Please select a department.");
+                        return;
+                    }
+
+                    var status = ListStatus?.SelectedValue?.ToString() ?? "Active";
+
+                    var result = UpdateEmployee(id, name, dob, departmentId, status);
+
+                    // perform update
+                    if (result)
+                    {
+                        LoadData(_loadDataQuery);
+                        MessageBox.Show("Employee updated.");
+                    }
+                    else
+                    {
+                        MessageBox.Show("No employee was updated.");
+                    }
+                }
+                else if (_currentView == "Departments")
+                {
+                    // Department-specific validation - use ListDepartmentName.Text
+                    var deptName = ListDepartmentName.Text?.Trim();
+
+                    if (string.IsNullOrWhiteSpace(deptName))
+                    {
+                        MessageBox.Show("Department name is required.");
+                        return;
+                    }
+
+                    var updateDeptResult = UpdateDepartment(id, deptName);
+                    if (updateDeptResult)
+                    {
+                        LoadData("SELECT Id, DepartmentName FROM Departments");
+                        LoadDepartment();
+                        MessageBox.Show("Department updated.");
+                    }
+                    else
+                    {
+                        MessageBox.Show("No department was updated.");
+                    }
+                }
                 else
                 {
-                    MessageBox.Show("Please select a department.");
-                    return;
+                    MessageBox.Show("Unknown view.");
                 }
-            }
-
-            catch
-            {
-                MessageBox.Show("Invalid department id.");
-                return;
-            }
-
-            var status = ListStatus?.SelectedValue?.ToString() ?? string.Empty;
-
-            try
-            {
-                UpdateEmployee(id,name, dob, departmentId, status);
-                // reload grid
-                LoadData(_loadDataQuery);
-                MessageBox.Show("Employee updated.");
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error updating employee: {ex.Message}");
+                MessageBox.Show($"Error updating: {ex.Message}");
             }
-
         }
-
+        // validate 
         
 
         private void ShowEmployeesView()
@@ -427,14 +546,14 @@ namespace WindowsFormsAppTesting
 
         private void ShowDepartmentsView()
         {
-            // disable employee inputs
+            // enable department inputs (use txtDepartmentName for department name)
             txtEmployeeName.Enabled = false;
             dtpDayOfBirth.Enabled = false;
             ListDepartmentName.Enabled = true;
             ListStatus.Enabled = false;
-            btn_Create.Enabled = false;
-            btn_Update.Enabled = false;
-            btn_Delete.Enabled = false;
+            btn_Create.Enabled = true;
+            btn_Update.Enabled = true;
+            btn_Delete.Enabled = true;
             txtDepartmentId.Enabled = true;
 
             // show departments only
