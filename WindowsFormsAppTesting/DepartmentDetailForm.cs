@@ -20,10 +20,10 @@ namespace WindowsFormsAppTesting
 
             try
             {
-                if (dgvEmployees.Columns.Contains("DepartmentId"))
-                    dgvEmployees.Columns["DepartmentId"].Visible = false;
-                if (dgvEmployees.Columns.Contains("DepartmentName"))
-                    dgvEmployees.Columns["DepartmentName"].Visible = false;
+                //if (dgvEmployees.Columns.Contains("DepartmentId"))
+                //    dgvEmployees.Columns["DepartmentId"].Visible = false;
+                //if (dgvEmployees.Columns.Contains("DepartmentName"))
+                //    dgvEmployees.Columns["DepartmentName"].Visible = false;
                 if (dgvEmployees.Columns.Contains("DayOfBirth"))
                     dgvEmployees.Columns["DayOfBirth"].DefaultCellStyle.Format = "dd/MM/yyyy";
             }
@@ -33,6 +33,11 @@ namespace WindowsFormsAppTesting
             }
         }
         private void DepartmentDetailForm_Load(object sender, EventArgs e)
+        {
+
+        }
+
+        private void dgvEmployees_CellContentClick(object sender, DataGridViewCellEventArgs e)
         {
 
         }

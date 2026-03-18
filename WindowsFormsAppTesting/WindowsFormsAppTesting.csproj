@@ -34,6 +34,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
+    <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
@@ -47,6 +48,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="DataAccess.cs" />
+    <Compile Include="DepartmentDetail.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="DepartmentDetail.Designer.cs">
+      <DependentUpon>DepartmentDetail.cs</DependentUpon>
+    </Compile>
     <Compile Include="DepartmentDetailForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -54,7 +61,14 @@
       <DependentUpon>DepartmentDetailForm.cs</DependentUpon>
     </Compile>
     <Compile Include="DepartmentRepository.cs" />
+    <Compile Include="EmployeeDetail.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="EmployeeDetail.Designer.cs">
+      <DependentUpon>EmployeeDetail.cs</DependentUpon>
+    </Compile>
     <Compile Include="EmployeeRepository.cs" />
+    <Compile Include="Fillter.cs" />
     <Compile Include="Form1.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -63,8 +77,14 @@
     </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <EmbeddedResource Include="DepartmentDetail.resx">
+      <DependentUpon>DepartmentDetail.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="DepartmentDetailForm.resx">
       <DependentUpon>DepartmentDetailForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="EmployeeDetail.resx">
+      <DependentUpon>EmployeeDetail.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Form1.resx">
       <DependentUpon>Form1.cs</DependentUpon>
